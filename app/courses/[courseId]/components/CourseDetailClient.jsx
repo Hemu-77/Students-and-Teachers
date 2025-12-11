@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import { useData } from "../../../../context/DataContext";
 import Link from "next/link";
+import gsap from "gsap";
 
 const CourseDetailClient = ({ courseId }) => {
   const {
@@ -32,14 +33,90 @@ const CourseDetailClient = ({ courseId }) => {
     .map((sid) => students.find((s) => s.id === sid))
     .filter(Boolean);
 
- 
+  // animation container
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const q = gsap.utils.selector(containerRef.current);
+
+    // Heading & top info
+    gsap.from(q(".course-heading"), {
+      y: -18,
+      opacity: 0,
+      duration: 0.7,
+      ease: "power2.out",
+    });
+
+    // Reveal drop zones
+    gsap.from(q("[aria-label='Teacher drop zone']"), {
+      y: 10,
+      opacity: 0,
+      duration: 0.6,
+      ease: "power2.out",
+    });
+    gsap.from(q("[aria-label='Students drop zone']"), {
+      y: 10,
+      opacity: 0,
+      duration: 0.6,
+      delay: 0.08,
+      ease: "power2.out",
+    });
+
+    // Reveal lists on the right
+    gsap.from(q(".teacher-item"), {
+      y: 20,
+      opacity: 0,
+      duration: 0.55,
+      stagger: 0.06,
+      ease: "power3.out",
+    });
+    gsap.from(q(".student-item"), {
+      y: 20,
+      opacity: 0,
+      duration: 0.55,
+      stagger: 0.06,
+      delay: 0.08,
+      ease: "power3.out",
+    });
+
+    // Enrolled students list reveal
+    gsap.from(q(".enrolled-item"), {
+      y: 12,
+      opacity: 0,
+      duration: 0.5,
+      stagger: 0.06,
+      ease: "power3.out",
+    });
+
+    // subtle color pulse for course name
+    gsap.to(q(".course-name"), {
+      color: "#b45309",
+      duration: 2,
+      repeat: -1,
+      yoyo: true,
+      ease: "sine.inOut",
+    });
+
+    // cleanup
+    return () => {
+      gsap.killTweensOf(q(".course-name"));
+      gsap.killTweensOf(q(".teacher-item"));
+      gsap.killTweensOf(q(".student-item"));
+      gsap.killTweensOf(q(".enrolled-item"));
+    };
+  }, []);
+
+  // drag/drop handlers
   const onDragStart = (e, payload) => {
-   
-    e.dataTransfer.setData("application/json", JSON.stringify(payload));
-    e.dataTransfer.effectAllowed = "move";
+    try {
+      e.dataTransfer.setData("application/json", JSON.stringify(payload));
+      e.dataTransfer.effectAllowed = "move";
+    } catch (err) {
+      // ignore
+    }
   };
 
-  
   const allowDrop = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
@@ -54,7 +131,7 @@ const CourseDetailClient = ({ courseId }) => {
         assignTeacherToCourse(numericCourseId, teacherId);
       }
     } catch (err) {
-     
+      // ignore
     }
   };
 
@@ -67,17 +144,28 @@ const CourseDetailClient = ({ courseId }) => {
         enrollStudentToCourse(numericCourseId, studentId);
       }
     } catch (err) {
-     
+      // ignore
     }
   };
 
+  // hover interactions for draggable items
+  const handleHoverEnter = (el) => {
+    if (!el) return;
+    gsap.to(el, { scale: 1.02, boxShadow: "0 10px 30px rgba(0,0,0,0.12)", duration: 0.18 });
+  };
+  const handleHoverLeave = (el) => {
+    if (!el) return;
+    gsap.to(el, { scale: 1, boxShadow: "0 4px 12px rgba(0,0,0,0.06)", duration: 0.18 });
+  };
+
   return (
-    <div className="grid grid-cols-3 gap-6">
-     
+    <div ref={containerRef} className="grid grid-cols-3 gap-6">
       <div className="col-span-2 border p-4 rounded">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-3xl font-bold">{course.name}</h1>
+            <h1 className="text-3xl font-bold course-heading">
+              <span className="course-name">{course.name}</span>
+            </h1>
             <p className="text-sm text-gray-600">Course ID: {course.id}</p>
           </div>
           <div>
@@ -87,7 +175,6 @@ const CourseDetailClient = ({ courseId }) => {
           </div>
         </div>
 
-        
         <div
           onDragOver={allowDrop}
           onDrop={onDropAssignTeacher}
@@ -115,21 +202,25 @@ const CourseDetailClient = ({ courseId }) => {
           )}
         </div>
 
-      
         <div
           onDragOver={allowDrop}
           onDrop={onDropEnrollStudent}
           className="p-4 border rounded bg-gray-50"
           aria-label="Students drop zone"
         >
-          <h2 className="text-xl font-semibold mb-2">Enrolled Students ({enrolledStudents.length})</h2>
+          <h2 className="text-xl font-semibold mb-2">
+            Enrolled Students ({enrolledStudents.length})
+          </h2>
 
           {enrolledStudents.length === 0 ? (
             <p className="text-sm text-gray-500">No students enrolled. Drag students here to enroll.</p>
           ) : (
             <ul className="space-y-2">
               {enrolledStudents.map((s) => (
-                <li key={s.id} className="flex items-center justify-between p-2 border rounded bg-white">
+                <li
+                  key={s.id}
+                  className="flex items-center justify-between p-2 border rounded bg-white enrolled-item"
+                >
                   <div>
                     <p className="font-medium">{s.name}</p>
                     <p className="text-sm text-gray-600">ID: {s.id}</p>
@@ -149,7 +240,6 @@ const CourseDetailClient = ({ courseId }) => {
         </div>
       </div>
 
-     
       <div className="border p-4 rounded">
         <h3 className="text-lg font-semibold mb-3">All Teachers</h3>
         <div className="space-y-2 mb-6">
@@ -158,7 +248,9 @@ const CourseDetailClient = ({ courseId }) => {
               key={t.id}
               draggable
               onDragStart={(e) => onDragStart(e, { type: "TEACHER", id: t.id })}
-              className="p-2 border rounded bg-white cursor-grab"
+              onMouseEnter={(e) => handleHoverEnter(e.currentTarget)}
+              onMouseLeave={(e) => handleHoverLeave(e.currentTarget)}
+              className="p-2 border rounded bg-white cursor-grab teacher-item"
             >
               <p className="font-medium">{t.name}</p>
               <p className="text-xs text-gray-500">ID: {t.id}</p>
@@ -173,7 +265,9 @@ const CourseDetailClient = ({ courseId }) => {
               key={s.id}
               draggable
               onDragStart={(e) => onDragStart(e, { type: "STUDENT", id: s.id })}
-              className="p-2 border rounded bg-white cursor-grab"
+              onMouseEnter={(e) => handleHoverEnter(e.currentTarget)}
+              onMouseLeave={(e) => handleHoverLeave(e.currentTarget)}
+              className="p-2 border rounded bg-white cursor-grab student-item"
             >
               <p className="font-medium">{s.name}</p>
               <p className="text-xs text-gray-500">ID: {s.id}</p>
